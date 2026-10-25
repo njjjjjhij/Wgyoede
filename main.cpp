@@ -9,24 +9,14 @@
 
 using namespace geode::prelude;
 
-// ---------------------------------------------------------------------------
-// Shared state + settings
-// ---------------------------------------------------------------------------
 namespace {
 
-// 1 "frame" = 1/60s = 4 physics ticks at the default 240 TPS.
 constexpr int STEPS_PER_FRAME = 4;
-// How close (units) the player has to be to an orb to count as touching it.
 constexpr float TOUCH = 30.f;
-// How far above/below the player an orb can be and still get auto-clicked.
-// Big on purpose: CBFH should fix clicks no matter where they land.
 constexpr float V_TOL = 120.f;
-
-// Orb object IDs: yellow, blue, pink, green, black, red, spider, dash, pink dash.
 constexpr int RING_IDS[] = {36, 84, 141, 1022, 1330, 1333, 1594, 1704, 1751};
 
 struct State {
-    // CBFH
     bool pending = false;
     bool releaseQueued = false;
     bool firing = false;
@@ -35,12 +25,10 @@ struct State {
     float lastX = 0.f;
     float dxPerStep = 10.4f;
     std::vector<GameObject*> rings;
-    // Click counter
     int clicks = 0;
     CCLabelBMFont* counter = nullptr;
 } S;
 
-// Setting keys from mod.json. Index 0 is CBFH.
 constexpr char const* KEYS[4] = {"cbfh-enabled", "fps-display", "practice-helper", "click-counter"};
 
 bool isOn(char const* key) {
@@ -65,14 +53,12 @@ bool touchingRing(PlayerObject* p) {
     for (auto* r : S.rings) {
         float dx = r->getPositionX() - px;
         if (dx < -TOUCH) continue;
-        if (dx > TOUCH) break;  // sorted by x
+        if (dx > TOUCH) break;
         if (std::abs(r->getPositionY() - py) <= TOUCH) return true;
     }
     return false;
 }
 
-// True if an orb is coming up inside the CBFH window, so the click
-// should be held and released on the exact tick the player touches it.
 bool shouldBuffer(PlayerObject* p) {
     float px = p->getPositionX(), py = p->getPositionY();
     float reach = S.dxPerStep * static_cast<float>(windowFrames() * STEPS_PER_FRAME);
@@ -80,10 +66,10 @@ bool shouldBuffer(PlayerObject* p) {
     for (auto* r : S.rings) {
         float dx = r->getPositionX() - px;
         if (dx < -TOUCH) continue;
-        if (dx > reach + TOUCH) break;  // sorted by x
+        if (dx > reach + TOUCH) break;
         float dy = std::abs(r->getPositionY() - py);
         if (dy > V_TOL) continue;
-        if (dx <= TOUCH && dy <= TOUCH) return false;  // already on the orb: click normally
+        if (dx <= TOUCH && dy <= TOUCH) return false;
         ahead = true;
     }
     return ahead;
@@ -106,15 +92,12 @@ CCNode* makeWIcon() {
 
 }  // namespace
 
-// ---------------------------------------------------------------------------
-// The click GUI (mobile-style popup)
-// ---------------------------------------------------------------------------
 class WMenuPopup : public geode::Popup {
 protected:
     CCLabelBMFont* m_windowLabel = nullptr;
     Slider* m_slider = nullptr;
 
-    static CCPoint P(float x, float y) { return ccp(x - 160.f, y - 130.f); }  // popup coords -> offset from center
+    static CCPoint P(float x, float y) { return ccp(x - 160.f, y - 130.f); }
 
     CCScale9Sprite* card(float w, float h, float x, float y, ccColor3B col, int opacity) {
         auto bg = CCScale9Sprite::create("square02b_001.png", {0, 0, 80, 80});
@@ -141,7 +124,6 @@ protected:
         if (!Popup::init(320.f, 260.f)) return false;
         this->setTitle("W Menu");
 
-        // --- CBFH card (main feature) ---
         card(296.f, 100.f, 160.f, 172.f, {0, 120, 40}, 150);
 
         auto cbfhTitle = CCLabelBMFont::create("CBFH", "bigFont.fnt");
@@ -178,7 +160,6 @@ protected:
         rightBtn->setTag(1);
         m_buttonMenu->addChildAtPosition(rightBtn, Anchor::Center, P(286.f, 144.f));
 
-        // --- The other features ---
         char const* names[3] = {"FPS Display", "Practice Helper", "Click Counter"};
         float xs[3] = {89.f, 231.f, 89.f};
         float ys[3] = {82.f, 82.f, 34.f};
@@ -195,7 +176,7 @@ protected:
 
     void onToggle(CCObject* sender) {
         auto t = static_cast<CCMenuItemToggler*>(sender);
-        bool nowOn = !t->isToggled();  // callback fires before the visual flips
+        bool nowOn = !t->isToggled();
         Mod::get()->setSettingValue<bool>(KEYS[t->getTag()], nowOn);
         applyGlobals();
     }
@@ -225,9 +206,6 @@ public:
     }
 };
 
-// ---------------------------------------------------------------------------
-// W icon: main menu + pause menu
-// ---------------------------------------------------------------------------
 class $modify(WMainMenu, MenuLayer) {
     bool init() {
         if (!MenuLayer::init()) return false;
@@ -266,9 +244,6 @@ class $modify(WPause, PauseLayer) {
     void onW(CCObject*) { WMenuPopup::create()->show(); }
 };
 
-// ---------------------------------------------------------------------------
-// Level hooks: orb cache, click counter, reset handling
-// ---------------------------------------------------------------------------
 class $modify(WPlayLayer, PlayLayer) {
     void setupHasCompleted() {
         PlayLayer::setupHasCompleted();
@@ -320,10 +295,6 @@ class $modify(WPlayLayer, PlayLayer) {
     }
 };
 
-// ---------------------------------------------------------------------------
-// CBFH: hold an early click and release it on the exact tick the player
-// touches the orb. Anything outside the window passes through untouched.
-// ---------------------------------------------------------------------------
 class $modify(WBaseGameLayer, GJBaseGameLayer) {
     bool isLivePlay() {
         auto pl = PlayLayer::get();
@@ -347,10 +318,10 @@ class $modify(WBaseGameLayer, GJBaseGameLayer) {
                 S.releaseQueued = false;
                 S.button = button;
                 S.stepsLeft = windowFrames() * STEPS_PER_FRAME;
-                return;  // swallow the early click; it gets fired on the perfect tick
+                return;
             }
             if (!down && S.pending && button == S.button) {
-                S.releaseQueued = true;  // keep the tap length
+                S.releaseQueued = true;
                 return;
             }
         }
@@ -358,8 +329,8 @@ class $modify(WBaseGameLayer, GJBaseGameLayer) {
         GJBaseGameLayer::handleButton(down, button, isPlayer1);
     }
 
-    void processCommands(float dt) {
-        if (this->isLivePlay()) {
+    void processCommands(float dt, bool isHalfTick, bool isLastTick) {
+        if (!isHalfTick && this->isLivePlay()) {
             float x = m_player1->getPositionX();
             float d = x - S.lastX;
             if (d > 0.f && d < 60.f) S.dxPerStep = d;
@@ -377,6 +348,6 @@ class $modify(WBaseGameLayer, GJBaseGameLayer) {
                 }
             }
         }
-        GJBaseGameLayer::processCommands(dt);
+        GJBaseGameLayer::processCommands(dt, isHalfTick, isLastTick);
     }
 };
