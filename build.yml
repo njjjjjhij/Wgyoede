@@ -1,0 +1,62 @@
+name: Build W Menu
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+jobs:
+  build-android64:
+    name: Build and verify Android64 Geode package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build with Geode SDK
+        id: build
+        uses: geode-sdk/build-geode-mod@main
+        with:
+          target: Android64
+          sdk: given
+
+      - name: Verify the package and its Android64 binary
+        shell: bash
+        env:
+          BUILD_OUTPUT: ${{ steps.build.outputs.build-output }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          packages=("${BUILD_OUTPUT}"/*.geode)
+          if (( ${#packages[@]} == 0 )); then
+            echo "ERROR: Geode build completed without producing a .geode package."
+            echo "Build output path: ${BUILD_OUTPUT}"
+            find . -type f \( -name '*.geode' -o -name '*.so' \) -print
+            exit 1
+          fi
+
+          for package in "${packages[@]}"; do
+            echo "Checking package: ${package}"
+            contents="$(unzip -Z1 "${package}")"
+            printf '%s\n' "${contents}"
+            if ! grep -Fxq 'mod.json' <<< "${contents}"; then
+              echo "ERROR: mod.json is missing from ${package}."
+              exit 1
+            fi
+            if ! grep -Fxq 'wmenu.cbfh.android64.so' <<< "${contents}"; then
+              echo "ERROR: wmenu.cbfh.android64.so is missing from ${package}."
+              echo "This artifact is not ready to install on Android64."
+              exit 1
+            fi
+          done
+
+      - name: Upload verified Geode package
+        uses: actions/upload-artifact@v4
+        with:
+          name: WMenu-Android64-geode-v1.0.1
+          path: ${{ steps.build.outputs.build-output }}/*.geode
+          if-no-files-found: error

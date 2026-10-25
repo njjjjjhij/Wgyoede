@@ -1,0 +1,19 @@
+{
+  "geode": "5.11.2",
+  "gd": {
+    "android": "2.2081"
+  },
+  "id": "wells.w-click-gui",
+  "name": "W Click GUI",
+  "version": "v1.0.0",
+  "developer": "Wells",
+  "description": "Mobile-friendly W menu and CBFH timing settings for Geometry Dash.",
+  "tags": ["gameplay", "interface", "utility", "offline"],
+  "settings": {
+    "cbfh-enabled": {"type": "bool", "name": "CBFH Enabled", "description": "Enable the CBFH helper setting.", "default": false},
+    "frame-window": {"type": "int", "name": "Frame Window", "description": "Configured timing window, from 1 to 20 frames.", "default": 1, "min": 1, "max": 20},
+    "fps-display": {"type": "bool", "name": "FPS Display", "default": false},
+    "practice-helper": {"type": "bool", "name": "Practice Helper", "default": false},
+    "click-counter": {"type": "bool", "name": "Click Counter", "default": false}
+  }
+}
